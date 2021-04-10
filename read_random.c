@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define SUFFLE_NUM 1000
+#define SUFFLE_NUM 10000
 
 void GenRecordSequence(int *list, int n);
 void swap(int *a, int *b);
@@ -20,13 +20,14 @@ int main(int argc, char **argv)
 	char buf[250];
 	FILE *fp;
 
-	if((fp = fopen(fname,"r"))==NULL){
+	if((fp = fopen(fname,"rb"))==NULL){
 		printf("error : file open\n");
 		return 0;
 	}
 	
 	fread(&num,4,1,fp);
 	
+	read_order_list = (int*)malloc(sizeof(int)*num);
 	GenRecordSequence(read_order_list, num);
 
 	gettimeofday(&start,NULL);
