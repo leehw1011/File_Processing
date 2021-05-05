@@ -15,13 +15,39 @@
 // 초기화 등의 작업을 수행한다. 따라서, 첫 번째 ftl_write() 또는 ftl_read()가 호출되기 전에
 // file system에 의해 반드시 먼저 호출이 되어야 한다.
 //
+extern FILE *flashfp;
+int mapping_table[DATABLKS_PER_DEVICE];	//0~15
+//int offset_table[DATABLKS_PER_DEVICE];
+int free_block;
+
 void ftl_open()
 {
 	//
 	// address mapping table 초기화 또는 복구
 	// free block's pbn 초기화
     	// address mapping table에서 lbn 수는 DATABLKS_PER_DEVICE 동일
-		
+
+	//우선 mapping table의 pbn 값을 모두 -1 로 초기화한다
+	for(int i=0;i<BLOCKS_PER_DEVICE;i++){
+		mapping_table[i]=-1;
+	}
+	free_block = DATABLKS_PER_DEVICE;
+	//사용하던 flash memory파일이 존재하는지 체크
+	//존재하면
+	if(flashfp != NULL){
+		//기존 파일에서 각 블록의 첫 번째 페이지의 spare 영역에서
+		//lbn에 대한 정보를 읽어서 address mapping table을 복구한다.
+		for(int i=0;i<BLOCKS_PER_DEVICE;i++){
+			int *lbn;
+			fseek(flashfp,BLOCK_SIZE*i,SEEK_SET);
+			fread(lbn,4,1,flashfp);
+			if(*lbn!=0xff){
+				mapping_table[*lbn]=i;
+			}
+			else free_block = i;
+		}
+	}
+	
 	return;
 }
 
