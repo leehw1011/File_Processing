@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
 				//sectorbuf 내용 출력
 				for(int i=0;i<SECTOR_SIZE;i++){
 					ch = sectorbuf[i];
-					if(ch==0xff) break;
+					if(ch=="\0") break;
 					printf("%c",ch);
 				}
 				break;
@@ -86,12 +86,13 @@ int main(int argc, char *argv[])
 				break;
 			case 3:
 				//ftl_print()
-				
+				ftl_print();
 				break;
 			case 0:
 				exit(0);
 				break;
 			default:
+				printf("존재하지 않는 옵션\n");
 				break;
 		}
 		printf("\n");
