@@ -24,6 +24,7 @@ int main(int argc, char *argv[])
 {
 	char *blockbuf;
 	char sectorbuf[SECTOR_SIZE];
+	char ch;
 	int lsn, i;
 	int option;
 
@@ -54,14 +55,23 @@ int main(int argc, char *argv[])
 	//
 	printf("\n(1 : ftl_read 2: ftl_write 3 : ftl_print 0 : exit)\n");
 	while(1){
-		//printf("(1 : ftl_read 2: ftl_write 3 : ftl_print 0 : exit)\n");
 		printf(">> ");
 		scanf("%d",&option);
 
 		switch(option){
 			case 1:
 				//ftl_read() 테스트
+				printf("Logical sector number : ");
+				scanf("%d",&lsn);
+
+				ftl_read(lsn,sectorbuf);
 				
+				//sectorbuf 내용 출력
+				for(int i=0;i<SECTOR_SIZE;i++){
+					ch = sectorbuf[i];
+					if(ch==0xff) break;
+					printf("%c",ch);
+				}
 				break;
 			case 2:
 				//ftl_write() 테스트

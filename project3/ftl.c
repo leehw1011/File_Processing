@@ -90,8 +90,28 @@ void ftl_open()
 //
 void ftl_read(int lsn, char *sectorbuf)
 {
+	char pagebuf[PAGE_SIZE];
+	int lbn, pbn, psn;
+	//printf("ftl_read() 호출됨!");
+	//lsn이 사용 가능한 범위가 아니면 에러
+	if(lsn<0||lsn>DATAPAGES_PER_DEVICE){
+		fprintf(stderr,"ftl_read error\n");
+		exit(1);
+	}
+	
+	lbn = lsn/PAGES_PER_BLOCK;
+	offset_table[lbn] = lsn%PAGES_PER_BLOCK;
 
+	pbn = mapping_table[lbn];
+	if(pbn==-1){
+		printf("해당 영역에는 data가 존재하지 않음\n");
+		return;
+	}
 
+	psn = pbn*PAGES_PER_BLOCK + offset_table[lbn];
+	dd_read(psn,pagebuf);
+	printf("pagebuf : %s\n",pagebuf);
+	memcpy(sectorbuf,pagebuf,SECTOR_SIZE);
 	return;
 }
 
@@ -106,7 +126,7 @@ void ftl_write(int lsn, char *sectorbuf)
 	printf("ftl_write 호출됨! \n");
 	//lsn이 사용 가능한 범위가 아니면 에러
 	if(lsn<0||lsn>DATAPAGES_PER_DEVICE){
-		fprintf(stderr,"ftl_write error");
+		fprintf(stderr,"ftl_write error\n");
 		exit(1);
 	}
 
