@@ -25,6 +25,7 @@ int main(int argc, char *argv[])
 	char *blockbuf;
 	char sectorbuf[SECTOR_SIZE];
 	int lsn, i;
+	int option;
 
 	flashfp = fopen("flashmemory", "w+b");
 	if(flashfp == NULL)
@@ -47,10 +48,45 @@ int main(int argc, char *argv[])
 	free(blockbuf);
 
 	ftl_open();    // ftl_read(), ftl_write() 호출하기 전에 이 함수를 반드시 호출해야 함
-
+	
 	//
 	// ftl_write() 및 ftl_read() 테스트 코드 작성
 	//
+	printf("\n(1 : ftl_read 2: ftl_write 3 : ftl_print 0 : exit)\n");
+	while(1){
+		//printf("(1 : ftl_read 2: ftl_write 3 : ftl_print 0 : exit)\n");
+		printf(">> ");
+		scanf("%d",&option);
+
+		switch(option){
+			case 1:
+				//ftl_read() 테스트
+				
+				break;
+			case 2:
+				//ftl_write() 테스트
+				printf("Logical sector number : ");
+				scanf("%d",&lsn);
+				printf("data : ");
+				scanf("%s",sectorbuf);
+
+				ftl_write(lsn,sectorbuf);
+				memset(sectorbuf,0,SECTOR_SIZE);
+
+				break;
+			case 3:
+				//ftl_print()
+				
+				break;
+			case 0:
+				exit(0);
+				break;
+			default:
+				break;
+		}
+		printf("\n");
+		
+	}
 
 
 	fclose(flashfp);

@@ -101,8 +101,10 @@ void ftl_read(int lsn, char *sectorbuf)
 //
 void ftl_write(int lsn, char *sectorbuf)
 {
-	char pagebuf[PAGE_SIZE]={0,};
-
+	char pagebuf[PAGE_SIZE];
+	int temp;	//temp block num
+	printf("ftl_write 호출됨! \n");
+	//lsn이 사용 가능한 범위가 아니면 에러
 	if(lsn<0||lsn>DATAPAGES_PER_DEVICE){
 		fprintf(stderr,"ftl_write error");
 		exit(1);
@@ -113,23 +115,38 @@ void ftl_write(int lsn, char *sectorbuf)
 	lbn = lsn/PAGES_PER_BLOCK;
 	offset_table[lbn]=lsn%PAGES_PER_BLOCK;
 
-	pbn = mapping_table[lbn];	//pbn이 -1 이면 처음쓰는거 아닌가
+	pbn = mapping_table[lbn];
+	//pbn == -1이면 최초로 쓰는 것
 	if(pbn==-1){
 		pbn = free_block;
+		mapping_table[lbn]=pbn;
 		free_block = set_free_block();
 	}
+	//pbn != -1이면 갱신
+	else{
+		temp = pbn;
+		pbn = free_block;
+		free_block = temp;
+		dd_erase(free_block);
+		mapping_table[lbn]=pbn;
+	}
 	psn = pbn*PAGES_PER_BLOCK + offset_table[lbn];
-
-	//psn의 spare영역 5-8번 바이트의 lsn을 읽어서
-	//최초로 쓰는지 갱신인지 확인?
-	//최초로 쓴다면(읽은 정보가 0xffffffff라면)
 	
+	//pagebuf내용 = sectorbuf(512) + lbn(4) + lsn(4)
+	memcpy(pagebuf,sectorbuf,SECTOR_SIZE);
+	memcpy(pagebuf+SECTOR_SIZE,&lbn,4);
+	memcpy(pagebuf+SECTOR_SIZE+4,&lsn,4);
 
-	//갱신이라면(읽은 정보가 0보다 크거나 같은 정수라면)
-	//
-	//
-	//address mapping table 갱신
-	//free block 갱신
+	printf("%s\n",pagebuf);
+	dd_write(psn,pagebuf);
+
+	//확인
+	printf("mapping table 확인 \n");
+	for(int i=0;i<DATABLKS_PER_DEVICE;i++){
+                printf("%d ",mapping_table[i]);
+        }
+	printf("\n free block : %d",free_block);
+
 	return;
 }
 
