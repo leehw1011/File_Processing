@@ -17,8 +17,10 @@
 //
 extern FILE *flashfp;
 int mapping_table[DATABLKS_PER_DEVICE];	//0~15
-//int offset_table[DATABLKS_PER_DEVICE];
+int offset_table[DATABLKS_PER_DEVICE];
 int free_block;
+
+int set_free_block();
 
 void ftl_open()
 {
@@ -27,27 +29,58 @@ void ftl_open()
 	// free block's pbn 초기화
     	// address mapping table에서 lbn 수는 DATABLKS_PER_DEVICE 동일
 
-	//우선 mapping table의 pbn 값을 모두 -1 로 초기화한다
+	//mapping table의 pbn 값을 모두 -1 로 초기화한다
+	//for(int i=0;i<BLOCKS_PER_DEVICE;i++){
+	//	mapping_table[i]=-1;
+	//}
+	//사용하던 flash memory파일이 존재하는지 체크
+	//존재하면
+	//if(1){
+		//기존 파일에서 각 블록의 첫 번째 페이지의 spare 영역에서
+		//lbn에 대한 정보를 읽어서 address mapping table을 복구한다.
+	//	for(int i=0;i<BLOCKS_PER_DEVICE;i++){
+	//		int *lbn;
+	//		fseek(flashfp,BLOCK_SIZE*i,SEEK_SET);
+	//		fread(lbn,4,1,flashfp);
+	//		if(*lbn!=0xff){	//0xffffffff?
+	//			mapping_table[*lbn]=i;
+	//		}
+	//		else free_block = i;
+	//	}
+	//}
+	char pagebuf[PAGE_SIZE];
+	int ppn;
+	int lbn=0;
+	//우선 mapping table 을 모두 -1로 설정한 후
 	for(int i=0;i<BLOCKS_PER_DEVICE;i++){
 		mapping_table[i]=-1;
 	}
-	free_block = DATABLKS_PER_DEVICE;
-	//사용하던 flash memory파일이 존재하는지 체크
-	//존재하면
-	if(flashfp != NULL){
-		//기존 파일에서 각 블록의 첫 번째 페이지의 spare 영역에서
-		//lbn에 대한 정보를 읽어서 address mapping table을 복구한다.
-		for(int i=0;i<BLOCKS_PER_DEVICE;i++){
-			int *lbn;
-			fseek(flashfp,BLOCK_SIZE*i,SEEK_SET);
-			fread(lbn,4,1,flashfp);
-			if(*lbn!=0xff){
-				mapping_table[*lbn]=i;
-			}
-			else free_block = i;
+	//flash memory 읽어서 기존에 있던 내용 불러오기
+	for(int i=0;i<BLOCKS_PER_DEVICE;i++){
+		ppn = i*4;
+		dd_read(ppn,pagebuf);
+		//printf("pagebuf의 내용 : %s\n",pagebuf);
+		//for(int j=0;j<4;j++){
+		//	lbn += (pagebuf[SECTOR_SIZE+j])<<4*(3-j);
+		//}
+		//
+		//spare영역의 lbn정보 - SECTOR_SIZE+3을 읽어야하나?
+		//lbn = pagebuf[SECTOR_SIZE+3];
+		lbn = pagebuf[SECTOR_SIZE];
+		//printf("lbn : %x\n",lbn);
+		if(lbn!=0xffffffff){
+			mapping_table[lbn]=i;
 		}
 	}
-	
+
+	printf("\n초기화 후 mapping table : \n");
+	for(int i=0;i<DATABLKS_PER_DEVICE;i++){
+                printf("%d ",mapping_table[i]);
+        }
+
+	//free block 초기화
+	free_block = set_free_block();
+	printf("free block : %d\n",free_block);
 	return;
 }
 
@@ -58,6 +91,7 @@ void ftl_open()
 void ftl_read(int lsn, char *sectorbuf)
 {
 
+
 	return;
 }
 
@@ -67,7 +101,35 @@ void ftl_read(int lsn, char *sectorbuf)
 //
 void ftl_write(int lsn, char *sectorbuf)
 {
+	char pagebuf[PAGE_SIZE]={0,};
 
+	if(lsn<0||lsn>DATAPAGES_PER_DEVICE){
+		fprintf(stderr,"ftl_write error");
+		exit(1);
+	}
+
+	//lsn으로 psn찾기
+	int lbn, pbn, psn;
+	lbn = lsn/PAGES_PER_BLOCK;
+	offset_table[lbn]=lsn%PAGES_PER_BLOCK;
+
+	pbn = mapping_table[lbn];	//pbn이 -1 이면 처음쓰는거 아닌가
+	if(pbn==-1){
+		pbn = free_block;
+		free_block = set_free_block();
+	}
+	psn = pbn*PAGES_PER_BLOCK + offset_table[lbn];
+
+	//psn의 spare영역 5-8번 바이트의 lsn을 읽어서
+	//최초로 쓰는지 갱신인지 확인?
+	//최초로 쓴다면(읽은 정보가 0xffffffff라면)
+	
+
+	//갱신이라면(읽은 정보가 0보다 크거나 같은 정수라면)
+	//
+	//
+	//address mapping table 갱신
+	//free block 갱신
 	return;
 }
 
@@ -75,4 +137,22 @@ void ftl_print()
 {
 
 	return;
+}
+
+int set_free_block(){
+	//이미 사용중인 block을 -1로
+	int block_num[DATABLKS_PER_DEVICE];
+	for(int i=0;i<DATABLKS_PER_DEVICE;i++){
+		block_num[i]=i;
+	}
+	for(int i=0;i<DATABLKS_PER_DEVICE;i++){
+		if(mapping_table[i]!=-1){
+			block_num[mapping_table[i]]=-1;
+		}
+	}
+	for(int i=0;i<DATABLKS_PER_DEVICE;i++){
+		if(block_num[i]!=-1){
+			return i;
+		}
+	}
 }
