@@ -18,7 +18,7 @@
 extern FILE *flashfp;
 int mapping_table[DATABLKS_PER_DEVICE];	//0~15
 int offset_table[DATABLKS_PER_DEVICE];
-int free_block=100;
+int free_block=-1;
 
 void set_free_block();
 
@@ -40,22 +40,21 @@ void ftl_open()
 	for(int i=0;i<BLOCKS_PER_DEVICE;i++){
 		ppn = i*4;
 		dd_read(ppn,pagebuf);
-		//spare영역의 lbn정보 - SECTOR_SIZE+3을 읽어야하나?
-		//lbn = pagebuf[SECTOR_SIZE+3];
-		lbn = pagebuf[SECTOR_SIZE];
+		//spare영역의 lbn정보
+		memcpy(&lbn,pagebuf+SECTOR_SIZE,4);
 		if(lbn!=0xffffffff){
 			mapping_table[lbn]=i;
 		}
 	}
 
-	printf("\n초기화 후 mapping table : \n");
+	/*printf("\n초기화 후 mapping table : \n");
 	for(int i=0;i<BLOCKS_PER_DEVICE;i++){
                 printf("%d ",mapping_table[i]);
-        }
+        }*/
 
 	//free block 초기화
 	set_free_block();
-	printf("free block : %d\n",free_block);
+	//printf("free block : %d\n",free_block);
 	return;
 }
 
@@ -131,7 +130,7 @@ void ftl_write(int lsn, char *sectorbuf)
 	memcpy(pagebuf+SECTOR_SIZE,&lbn,4);
 	memcpy(pagebuf+SECTOR_SIZE+4,&lsn,4);
 
-	printf("%s\n",pagebuf);
+	//printf("ftl_write - pagebuf 내용 : %s\n",pagebuf);
 	dd_write(psn,pagebuf);
 
 	//확인
@@ -155,7 +154,6 @@ void ftl_print()
 }
 
 void set_free_block(){
-	//왜 여기서 mapping_table[15] 값이 바뀌지????
 	int pbn[BLOCKS_PER_DEVICE];	//0~15
 	int num;
 	for(int i=0;i<BLOCKS_PER_DEVICE;i++){
