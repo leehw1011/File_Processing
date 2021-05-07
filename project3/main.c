@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
 				//sectorbuf 내용 출력
 				for(int i=0;i<SECTOR_SIZE;i++){
 					ch = sectorbuf[i];
-					if(ch=="\0") break;
+					if(ch==NULL) break;
 					printf("%c",ch);
 				}
 				break;
