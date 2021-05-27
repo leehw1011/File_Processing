@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <string.h>
+#include <unistd.h>
 #include "person.h"
 //필요한 경우 헤더 파일과 함수를 추가할 수 있음
 
@@ -38,7 +40,7 @@ void writePage(FILE *fp, const char *pagebuf, int pagenum)
 // 
 void pack(char *recordbuf, const Person *p)
 {
- 
+	sprintf(recordbuf,"%s#%s#%s#%s#%s#%s#",p->id,p->name,p->age,p->addr,p->phone,p->email);
 }
  
 // 
@@ -54,7 +56,11 @@ void unpack(const char *recordbuf, Person *p)
 //
 void add(FILE *fp, const Person *p)
 {
- 
+	//이 안에서 pack()호출?
+	char recordbuf[MAX_RECORD_SIZE];
+
+	memset(recordbuf,(char)0xFF,MAX_RECORD_SIZE);
+	pack(recordbuf,p);
 }
  
 //
@@ -68,7 +74,60 @@ void delete(FILE *fp, const char *id)
 int main(int argc, char *argv[])
 {
 	FILE *fp;  // 레코드 파일의 파일 포인터
+	Person p;
+	int filesize;
 
+	// 파일이 존재할 경우 "r+"모드로 열기
+	if(access(argv[2],F_OK) == 0){
+		if((fp = fopen(argv[2],"r+"))==NULL){
+			printf("file open error\n");
+		}
+	}
+	// 파일이 존재하지 않는 경우 "w+"모드로 열기
+	else{
+		if((fp = fopen(argv[2],"w+"))==NULL){
+			printf("file open error\n");
+		}
+	}
+
+	// open한 파일이 비어있는 경우 헤더 레코드를 만들어야한다.
+	fseek(fp,0,SEEK_END);
+	filesize = ftell(fp);
+	if(filesize==0){
+		char headerRecord[16];
+		memset(headerRecord,(char)0xFF,16);
+		// 초기 헤더레코드 값 0 0 -1 -1
+		int num0 = 0, num1 = -1;
+		memcpy(headerRecord,&num0,4);
+		memcpy(headerRecord+4,&num0,4);
+		memcpy(headerRecord+8,&num1,4);
+		memcpy(headerRecord+12,&num1,4);
+		
+                fwrite(headerRecord,16,1,fp);
+
+	}
+
+	// 입력된 옵션이 a이면 add 작업을 실행
+	if(argv[1][0]=='a'){
+		printf("add를 실행해야함\n");	//
+		
+		// 입력된 정보를 구조체에  저장하기
+		strcpy(p.id,argv[3]);
+		strcpy(p.name,argv[4]);
+		strcpy(p.age,argv[5]);
+		strcpy(p.addr,argv[6]);
+                strcpy(p.phone,argv[7]);
+                strcpy(p.email,argv[8]);
+
+		add(fp,&p);
+
+	}
+
+	else if(argv[1][0]=='d'){
+		printf("delete를 실행해야함\n");
+	}
+
+	else return 1;
 
 	return 1;
 }
