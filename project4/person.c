@@ -37,7 +37,6 @@ void headerUpdate(FILE *fp, int total_page, int total_record, int last_pagenum, 
 //
 // 페이지 번호에 해당하는 페이지를 주어진 페이지 버퍼에 읽어서 저장한다. 페이지 버퍼는 반드시 페이지 크기와 일치해야 한다.
 //
-//
 void readPage(FILE *fp, char *pagebuf, int pagenum)
 {
 	fseek(fp,16+PAGE_SIZE*pagenum,SEEK_SET);
@@ -90,7 +89,6 @@ void unpack(const char *recordbuf, Person *p)
 	return;
 }
 
- 
 //
 // 새로운 레코드를 저장하는 기능을 수행하며, 터미널로부터 입력받은 필드값들을 구조체에 저장한 후 아래 함수를 호출한다.
 //
@@ -151,7 +149,6 @@ void add(FILE *fp, const Person *p)
 		// 페이지에 남은 공간이 저장하려는 레코드보다 크고 & 헤더 영역에도 남은 공간이 있어야함
 		if(DATA_AREA_SIZE-offset>=record_length && HEADER_AREA_SIZE-(4+8*recordnum)>=8){
 			recordnum++;
-			//이게 맞나?
                        	memcpy(pagebuf,&recordnum,4);
                        	memcpy(pagebuf+4+8*(recordnum-1),&offset,4);
           		memcpy(pagebuf+8+8*(recordnum-1),&record_length,4);
@@ -164,7 +161,6 @@ void add(FILE *fp, const Person *p)
 
 		else{
 			// 새로 페이지 생성
-			printf("새로 페이지 생성\n");
 			recordnum=1;
 			offset=0;
 			memset(pagebuf,(char)0xFF,PAGE_SIZE);
@@ -177,10 +173,51 @@ void add(FILE *fp, const Person *p)
 		}
 	}
 
-	//삭제된 레코드가 있는 경우
+	// 삭제된 레코드가 있는 경우
 	else{
-		printf("삭제 레코드가 있는 경우\n");
-		
+		// 이전에 삭제된 레코드가 존재하면 계속 탐색
+		int beforePage = -1, beforeRecord=-1;
+		while(last_pagenum!=-1&&last_recordnum!=-1){
+			memset(pagebuf,(char)0xFF,PAGE_SIZE);
+			readPage(fp,pagebuf,last_pagenum);
+			int len=0;
+			memcpy(&len,pagebuf+8*(last_recordnum+1),sizeof(int));
+			memcpy(&offset,pagebuf+4+8*last_recordnum,sizeof(int));
+			if(len>=record_length){
+				// list 수정
+				int nextpage=0, nextrecord=0;
+				memcpy(&nextpage,pagebuf+HEADER_AREA_SIZE+offset+1,sizeof(int));
+				memcpy(&nextrecord,pagebuf+HEADER_AREA_SIZE+offset+5,sizeof(int));
+				if(beforePage==-1){
+					//헤더레코드를 수정
+					headerUpdate(fp,total_page,total_record,nextpage,nextrecord);
+				}
+				else{
+					//beforePage를 수정
+					char pbuf[PAGE_SIZE];
+					int temp_offset;
+					memset(pbuf,(char)0xFF,PAGE_SIZE);
+					readPage(fp,pbuf,beforePage);
+					memcpy(&temp_offset,pbuf+4+8*beforeRecord,sizeof(int));
+					memcpy(pbuf+HEADER_AREA_SIZE+temp_offset+1,&nextpage,sizeof(int));
+					memcpy(pbuf+HEADER_AREA_SIZE+temp_offset+5,&nextrecord,sizeof(int));
+					writePage(fp,pbuf,beforePage);
+
+				}
+
+				// 그 자리에 삽입
+				memcpy(pagebuf+HEADER_AREA_SIZE+offset,recordbuf,record_length);
+				writePage(fp,pagebuf,last_pagenum);
+				break; 
+			}
+
+			// 리스트의 다음 레코드 탐색을 위해
+			beforePage = last_pagenum;
+			beforeRecord = last_recordnum;
+			memcpy(&last_pagenum,pagebuf+HEADER_AREA_SIZE+offset+1,sizeof(int));
+			memcpy(&last_recordnum,pagebuf+HEADER_AREA_SIZE+offset+5,sizeof(int));
+
+		}
 	}
 }
  
@@ -189,7 +226,6 @@ void add(FILE *fp, const Person *p)
 //
 void delete(FILE *fp, const char *id)
 {
-	printf("1: delete()호출\n");
 	char dmark = '*';
 	int total_page, total_record, last_pagenum, last_recordnum;
 	char pagebuf[PAGE_SIZE];
@@ -203,7 +239,6 @@ void delete(FILE *fp, const char *id)
 	memcpy(&total_record,headbuf+4,4);
 	memcpy(&last_pagenum,headbuf+8,4);
 	memcpy(&last_recordnum,headbuf+12,4);
-	printf("2: totalpage, totalrecord, lastpagenum, lastrecordnum : %d %d %d %d\n",total_page,total_record,last_pagenum,last_recordnum);
 
 	for(int i=0;i<total_page;i++){
 		memset(pagebuf,(char)0xFF,PAGE_SIZE);
@@ -211,7 +246,6 @@ void delete(FILE *fp, const char *id)
 
 		recordnum=0;
 		memcpy(&recordnum,pagebuf,sizeof(int));
-		printf("recordnum : %d\n",recordnum);
 
 		for(int j=0;j<recordnum;j++){
 			memset(recordbuf,(char)0xFF,MAX_RECORD_SIZE);
@@ -223,8 +257,6 @@ void delete(FILE *fp, const char *id)
 				memcpy(pagebuf+HEADER_AREA_SIZE+offset+1,&last_pagenum,4);
 				memcpy(pagebuf+HEADER_AREA_SIZE+offset+5,&last_recordnum,4);
 				writePage(fp,pagebuf,i);
-
-				printf("헤더 업데이트 내용 %d %d %d %d\n",total_page, total_record, i, j);
 				headerUpdate(fp,total_page,total_record,i,j);
 				break;
 			}
