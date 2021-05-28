@@ -120,7 +120,7 @@ void add(FILE *fp, const Person *p)
         if(total_record==0){
 		recordnum = 1;
 		offset = 0;
-		memset(pagebuf,(char)0x00,PAGE_SIZE);
+		memset(pagebuf,(char)0xFF,PAGE_SIZE);
 		memcpy(pagebuf,&recordnum,4);
 		memcpy(pagebuf+4,&offset,4);
 		memcpy(pagebuf+8,&record_length,4);
@@ -134,7 +134,7 @@ void add(FILE *fp, const Person *p)
 	//첫 저장이 아니지만 삭제 레코드가 없는 경우
 	if(last_pagenum==-1 && last_recordnum==-1){
 		//마지막 페이지에 레코드를 저장할 수 있는지 확인하자.
-		memset(pagebuf,(char)0x00,PAGE_SIZE);
+		memset(pagebuf,(char)0xFF,PAGE_SIZE);
 		readPage(fp,pagebuf,total_page-1);
 
 		int len = 0;
@@ -167,7 +167,7 @@ void add(FILE *fp, const Person *p)
 			printf("새로 페이지 생성\n");
 			recordnum=1;
 			offset=0;
-			memset(pagebuf,(char)0x00,PAGE_SIZE);
+			memset(pagebuf,(char)0xFF,PAGE_SIZE);
 			memcpy(pagebuf,&recordnum,4);
 	                memcpy(pagebuf+4,&offset,4);
         	        memcpy(pagebuf+8,&record_length,4);
@@ -189,6 +189,7 @@ void add(FILE *fp, const Person *p)
 //
 void delete(FILE *fp, const char *id)
 {
+	printf("1: delete()호출\n");
 	char dmark = '*';
 	int total_page, total_record, last_pagenum, last_recordnum;
 	char pagebuf[PAGE_SIZE];
@@ -202,6 +203,7 @@ void delete(FILE *fp, const char *id)
 	memcpy(&total_record,headbuf+4,4);
 	memcpy(&last_pagenum,headbuf+8,4);
 	memcpy(&last_recordnum,headbuf+12,4);
+	printf("2: totalpage, totalrecord, lastpagenum, lastrecordnum : %d %d %d %d\n",total_page,total_record,last_pagenum,last_recordnum);
 
 	for(int i=0;i<total_page;i++){
 		memset(pagebuf,(char)0xFF,PAGE_SIZE);
@@ -213,10 +215,18 @@ void delete(FILE *fp, const char *id)
 
 		for(int j=0;j<recordnum;j++){
 			memset(recordbuf,(char)0xFF,MAX_RECORD_SIZE);
-			offset = 4+8*j;
-			char *ptr = strtok(pagebuf+HEADER_AREA_SIZE+offset+1,"#");
+			memcpy(&offset,pagebuf+4+(8*j),4);
+			char *ptr = strtok(pagebuf+HEADER_AREA_SIZE+offset,"#");
 			if(strcmp(ptr,id)==0){
 				// 삭제 작업
+				memcpy(pagebuf+HEADER_AREA_SIZE+offset,&dmark,1);
+				memcpy(pagebuf+HEADER_AREA_SIZE+offset+1,&last_pagenum,4);
+				memcpy(pagebuf+HEADER_AREA_SIZE+offset+5,&last_recordnum,4);
+				writePage(fp,pagebuf,i);
+
+				printf("헤더 업데이트 내용 %d %d %d %d\n",total_page, total_record, i, j);
+				headerUpdate(fp,total_page,total_record,i,j);
+				break;
 			}
 		}
 
@@ -274,9 +284,10 @@ int main(int argc, char *argv[])
 
 	// 입력된 옵션이 d이면 delete 작업을 실행
 	else if(argv[1][0]=='d'){
-		char *id;
-		strcpy(id,argv[3]);
+
+		char *id = argv[3];
 		delete(fp,id);
+
 	}
 
 	else printf("잘못된 옵션입니다.\n");
