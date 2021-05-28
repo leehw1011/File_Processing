@@ -111,24 +111,21 @@ void add(FILE *fp, const Person *p)
 	memset(headbuf,(char)0xFF,16);
 	fseek(fp,0,SEEK_SET);
 	fread(headbuf,16,1,fp);
-	//printf("%s\n",headbuf);
 	memcpy(&total_page,headbuf,4);	//전체 데이터 페이지 수
 	memcpy(&total_record,headbuf+4,4);	//레코드 파일에 존재하는 모든 레코드의 수
 	memcpy(&last_pagenum,headbuf+8,4);	//가장 최근 삭제된 레코드의 페이지 번호
 	memcpy(&last_recordnum,headbuf+12,4);	//가장 최근 삭제된 레코드 번호
 
 	//최초의 저장인 경우
-	//printf("total_record : %d\n",total_record);
         if(total_record==0){
-		printf("첫 저장인 경우!\n");
 		recordnum = 1;
 		offset = 0;
-		memset(pagebuf,(char)0xFF,PAGE_SIZE);
+		memset(pagebuf,(char)0x00,PAGE_SIZE);
 		memcpy(pagebuf,&recordnum,4);
 		memcpy(pagebuf+4,&offset,4);
 		memcpy(pagebuf+8,&record_length,4);
 		memcpy(pagebuf+HEADER_AREA_SIZE,recordbuf,record_length);
-		writePage(fp,pagebuf,1);
+		writePage(fp,pagebuf,0);
         	// 페이지 수, 레코드 수 증가
 		headerUpdate(fp,total_page+1,total_record+1,last_pagenum,last_recordnum);
 		return;
@@ -136,36 +133,33 @@ void add(FILE *fp, const Person *p)
 
 	//첫 저장이 아니지만 삭제 레코드가 없는 경우
 	if(last_pagenum==-1 && last_recordnum==-1){
-		printf("삭제 레코드가 없는 경우\n");
 		//마지막 페이지에 레코드를 저장할 수 있는지 확인하자.
-		memset(pagebuf,(char)0xFF,PAGE_SIZE);
+		memset(pagebuf,(char)0x00,PAGE_SIZE);
 		readPage(fp,pagebuf,total_page-1);
+
 		int len = 0;
 		offset = 0;
 		//recordnum : 해당 페이지에 저장된 레코드의 수
 		memset(&recordnum,0,sizeof(int));
-		memcpy(&recordnum,pagebuf,sizeof(int));	//이것부터 안되는것같은데?
-		printf("??recordnum : %d??\n",recordnum);
-		for(int i=1;i<=recordnum;i++){
+		memcpy(&recordnum,pagebuf,sizeof(int));
+		for(int i=0;i<recordnum;i++){
 			memset(&len,0,sizeof(int));
-			memcpy(&len,pagebuf+4+(8*i),sizeof(int));
+			memcpy(&len,pagebuf+8*(i+1),sizeof(int));
 			offset += len;
-			printf("%d : offset : %d\n",i,offset);
 		}
 
 		// 페이지에 남은 공간이 저장하려는 레코드보다 크고 & 헤더 영역에도 남은 공간이 있어야함
 		if(DATA_AREA_SIZE-offset>=record_length && HEADER_AREA_SIZE-(4+8*recordnum)>=8){
-			printf("여기까지 왔나요?\n");
-
+			recordnum++;
+			//이게 맞나?
                        	memcpy(pagebuf,&recordnum,4);
-                       	memcpy(pagebuf+4,&offset,4);
-          		memcpy(pagebuf+8,&record_length,4);
+                       	memcpy(pagebuf+4+8*(recordnum-1),&offset,4);
+          		memcpy(pagebuf+8+8*(recordnum-1),&record_length,4);
                		memcpy(pagebuf+HEADER_AREA_SIZE+offset,recordbuf,record_length);
-			writePage(fp,pagebuf,1);
+			writePage(fp,pagebuf,total_page-1);
 			
 			// 레코드 수 1 증가
 			headerUpdate(fp,total_page,total_record+1,last_pagenum,last_recordnum);
-
 		}
 
 		else{
@@ -173,7 +167,7 @@ void add(FILE *fp, const Person *p)
 			printf("새로 페이지 생성\n");
 			recordnum=1;
 			offset=0;
-			memset(pagebuf,(char)0xFF,PAGE_SIZE);
+			memset(pagebuf,(char)0x00,PAGE_SIZE);
 			memcpy(pagebuf,&recordnum,4);
 	                memcpy(pagebuf+4,&offset,4);
         	        memcpy(pagebuf+8,&record_length,4);
@@ -248,7 +242,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	// open한 파일이 비어있는 경우 헤더 레코드를 만들어야한다.
+	// open한 파일이 비어있는 경우 헤더 레코드 만들기
 	fseek(fp,0,SEEK_END);
 	filesize = ftell(fp);
 	if(filesize==0){
@@ -267,8 +261,6 @@ int main(int argc, char *argv[])
 
 	// 입력된 옵션이 a이면 add 작업을 실행
 	if(argv[1][0]=='a'){
-		printf("add를 실행해야함\n");	//
-		
 		// 입력된 정보를 구조체에 저장하기
 		strcpy(p.id,argv[3]);
 		strcpy(p.name,argv[4]);
@@ -278,11 +270,10 @@ int main(int argc, char *argv[])
                 strcpy(p.email,argv[8]);
 
 		add(fp,&p);
-
 	}
 
+	// 입력된 옵션이 d이면 delete 작업을 실행
 	else if(argv[1][0]=='d'){
-		printf("delete를 실행해야함\n");
 		char *id;
 		strcpy(id,argv[3]);
 		delete(fp,id);
